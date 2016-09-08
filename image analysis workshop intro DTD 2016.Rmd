@@ -1,0 +1,360 @@
+---
+title: "Intro DTD"
+author: "Steven Wink Ph.D."
+date: "Tue 13 Sept 15.30 - 17.30:  	LCP 06"
+output: html_document
+---
+
+![](Capture.PNG  )
+
+## Biological application
+This 96-well plate has images of cytoplasm to nucleus translocation of the Forkhead (FKHR-EGFP) fusion protein in stably transfected human osteosarcoma cells, U2OS. In proliferating cells, FKHR is localized in the cytoplasm. Even without stimulation, Forkhead is constantly moving into the nucleus, but is transported out again by export proteins. Upon inhibition of nuclear export, FKHR accumulates in the nucleus. In this assay, export is inhibited by blocking PI3 kinase / PKB signaling by incubating cells for 1 h with Wortmannin or with the compound LY294002. Both drugs are considered positive controls in the assay. Nuclei are stained with DRAQ, a DNA stain.
+
+
+source: https://data.broadinstitute.org/bbbc/BBBC013/
+
+
+## complete the analysis by following the steps bellow. Then answer the questions.
+
+
+*1) In RStudio, go to *File -> New File -> R Script*
+
+The new R script is displayed in the text editor pane. This is where you type the commands/ code.
+Execute a line of your code by pressing _CTRL ENTER_. The line where your cursor is active is executed. You can also select multiple lines or a small part of code to execute in the same manner.  
+
+
+*2) Install the following external packages, which contain the needed functionality for image analysis and graphics.*
+
+```{r, eval=FALSE }
+
+source("http://bioconductor.org/biocLite.R") # bioconductor installation scripts
+
+biocLite("EBImage") # run installation script for "EBImage" - the image analysis package
+
+install.packages(c("ggplot2" ,"stringr"), repos="http://cran.rstudio.com/")
+
+```
+
+
+*3) Load the installed packages (this has to be done for every R-session)*
+
+```{r }
+require(ggplot2)
+require(EBImage)
+require(stringr)
+```
+
+*EBImage: This package contains our image analysis functions.  
+for more information on this package you can visit:  
+https://bioconductor.org/packages/release/bioc/vignettes/EBImage/inst/doc/EBImage-introduction.html  
+*ggplot2: A graphics package 
+*stringr: A regular expression package for working with strings 
+
+
+*4) Execute the following 5 commands, then have a look at the created folder structure.*  
+
+```{r }
+dir.create("~/imageanalysis")
+
+setwd("~/imageanalysis")
+
+dir.create("results")
+
+dir.create("layout")
+
+dir.create("scripts")
+```
+
+
+*5) Download and unzip the BBBC013 image set:*
+
+```{r }
+
+download.file(url = "http://d1zymp9ayga15t.cloudfront.net/content/Examplezips/ExampleSBSImages.zip",
+               destfile = "images.zip")
+
+unziplist <- unzip( zipfile = "images.zip", list = TRUE) # list all files inside the zip 
+unzipfiles <- unziplist$Name[ grepl(".tif", unziplist$Name)] # pull out all files containing ".tif"
+unzip(zipfile = "images.zip",  files = unzipfiles)
+
+
+```
+
+*6) Unpack and load the file containing the metadata information.*  
+
+```{r }
+unzipmetadata <- unziplist$Name[ grepl(".csv", unziplist$Name)] # pull out all files containing ".tif"
+unzip(zipfile = "images.zip", exdir = "layout",  files = unzipmetadata )
+
+metadata <- read.csv( file = "layout/ExampleSBSImages/1049_Metadata.csv")
+
+```
+
+Now that the images are in ```imageanalysis/ExampleSBSImages``` and the metadata in ```imageanalysis/layout/ExampleSBSImages```  
+we can start our analysis  
+
+
+An image is basically a set of matrixes (containing the pixel values) 
+with headers containing information needed for image display:
+
+*7) Look at one of the images from our image set*  
+
+```{r}
+path_to_image <- "ExampleSBSImages/Channel1-23-B-11.tif"
+
+readImage(path_to_image)
+
+display(readImage(path_to_image))
+```
+
+
+Different dyes can be used to observe distinct features, including structures, proteins, and different organelles within cells. This image set contains two channels of which one constitutes the nucleus (Channel2), and the the second channel is FKHR-GFP which can be located in the nucleus and the cytosol.
+
+*8) Look at both channels superimposed on one another.*
+
+```{r }
+
+image_paths <- paste0("ExampleSBSImages/", dir("ExampleSBSImages")) # define paths to images
+image_paths <- image_paths[grepl(".tif$", image_paths)] # keep only paths to tif images
+
+image_paths_dna <- image_paths[grepl("Channel2", image_paths)] 
+image_paths_fkhr <- image_paths[grepl("Channel1", image_paths)] 
+
+image_dna <- readImage( image_paths_dna[13] )
+image_fkhr <- readImage( image_paths_fkhr[13] )
+
+display(image_dna) 
+display(image_fkhr)
+display(
+  rgbImage(green = image_fkhr, blue = image_dna)
+)
+
+```
+
+*Q 1) Which treatment did we display? (the indexing of all the paths was done with ```[13]```)*  
+*Q 2) Describe the difference between a negative and positve control. Do this by displaying the controls (check the metadata or, go to the url displayed on the first page and look at the plate layout).*  
+
+
+## Nuclei segmentation and object identification  
+
+Segmentation is the recognition of objects in images by a computer, using for example the pixel intensity values.
+Consider an image to be a collection of pixels in the 2D grid/matrix. The stained DNA/ nuclei thus each form a
+collection/cluster of higher valued pixels than the surrounding background. Setting a threshold/ offset to determine
+"foreground" objects (the nuclei) vs the lower intensity value pixels of the background is a usefull method to determine
+which pixels belong to nuclei objects.
+
+There are 3 parameters needed for a correct segmentation.  
+We will use an adaptive threshholding algorithm, so the threshhold value can change in windows of width X height. The starting value for the thresholding optimization is the nuclei.offset
+Make sure you are happy with your chosen `adaptive.width`, `adaptive.height` and `nuclei.offset` settings because these will be  
+used for the full analysis of all images later on. The adaptive width and height are measured in pixels.
+
+tip: what is the mean intensity value? `mean(nuclei.image)`
+
+*Q3) Why would the mean intensity value of the stained nuclei be usefull? (Think of pixel intensity values)*  
+*Q4) What would you consider to be the maximum values of the adaptive width and height parameters?*  
+
+*9) Set the parameters and test on the selected nuclei image. Make sure the segmentation is satisfactory*
+
+```{r }
+
+mean(image_dna)
+
+adaptive.width <- 10 # set parameter (the size in pixels of the windows in which the optimized threshold values will be constant )
+adaptive.height <- 10  # set parameter
+nuclei.offset <-  0.03 # set parameter
+
+# remember to keep looking at the original image to compare:
+display(image_dna)
+
+#the ```thresh()``` function will perform the segmentation, this function takes your parameters as arguments
+
+nmask = thresh(image_dna, w=adaptive.width, h=adaptive.height, offset=nuclei.offset) 
+display(nmask) 
+
+
+```
+
+*Q5) Describe what the foreground objects from the segmentation by the ```thresh()``` look like when displayed.*  
+*Q6) Explain what thresholding is - i.e. what information is gained by the algorithm?*  
+
+To improve the thresholding, often smoothing filters are applied to the raw images - before the segmentation.  
+Noisy (outlier) pixel intensities are averaged out, making it easier for the algorithm to recognize the cells because the cells then consist of more or less the same pixel intensities, and the background will also have more of the same pixel intensity values. In effect we lowered the intensity variance within the foreground (the cells in our case) and background.  
+
+*10) filter the raw images before segmenting*  
+
+```{r }
+
+image_dna_f <- medianFilter(image_dna, size = 2) 
+display(image_dna_f)
+nmask = thresh(nuclei.image.f, w=adaptive.width, h=adaptive.height, offset=nuclei.offset) 
+display(nmask) 
+```
+
+*Q7) Desribe the difference you see by increasing the median filter size. Can you explain this?* (Do no set a smaller median filter size than 2, the algorithm will take too long to compute)
+
+*11) erode & dilate the masked image*
+
+```{r }
+
+nmask = opening(nmask, makeBrush(7, shape="disc")) # erosion + dilation
+display(nmask)
+
+```
+
+Eroding is removing 'outer' pixels from our mask (segmented image), dilating is adding 'outer' pixels
+
+*Q8) Did the segmentation improve using erosion/dilation algorithm?*
+*Q9) Explain why this would work*  
+
+
+*12) label and count the identified foreground objects from the mask image.*  
+
+```{r }
+
+nmask = bwlabel(nmask) # label nuclei: defining objects (each distincly segmented nuclei gets a number)
+max(nmask) # number of nuclei
+
+``` 
+
+download.file( url = "https://raw.github.com/Hardervidertsie/teaching_intro/master/AnalyzeAll.R",
+destfile = "scripts/AnalyzeAll.R" )
+
+
+## Cytosol propagation  
+
+Here the nuclei objects are used as starting points (seeds) to find the corresponding cytosol from the GFP stained images.
+Set the `cytosol.offset` for a good segmentation
+Use the same trick for a good starting point
+```{r }
+mean(cytosol.image)
+cytosol.offset <- 0.004  # set parameter 
+cytosolmask = opening(cytosol.image > cytosol.offset, makeBrush(5, shape="disc")) # erode + dilate, threshhold and smooth
+display(cytosolmask) # happy?
+celmask = propagate(cytosol.image, seeds=nmask, mask=cytosolmask) # use cytosol mask to assign a cytosol to each nuclei
+display(celmask)
+2
+res <- paintObjects(celmask, 16*img, col="#ff00ff")  # paintObjects makes nice outlines of segmentation results
+res = paintObjects(nmask, res, col= "#ffff00") # add nuclei mask outline
+display(res) # display final results
+```
+
+Q6) Describe the yellow and purple lines. What do they represent?
+
+## computeFeatures
+Use the computeFeatures function to calculate the intensity data for each cell.
+```{r }
+mean.int.data <- computeFeatures.basic(x = nmask, cytosol.image)
+head(mean.int.data) # have a look at the data, more intensity measures are calculated
+# should we consider the single cell data in the analysis or can we take the mean value?
+plot(density(mean.int.data[, 'b.mean']))
+```
+
+###Q7) What do the first and second peaks represent?
+###Q8) Where would you place the offset value? Would this be a horizontal or vertical line in the density plot?
+
+
+## Run analysis with obtained parameters
+Now you know what is going on, we will run a function which basically does the same we did before - but for all images.  
+The function will require your image-analysis parameters as arguments
+With `source(function name)' we will load this function in R memory
+**Make sure you first download the R script file *AnalyzeAll.R* and place it in your working directory**
+The `AnalyzeAll.R()' function will load the images from your image folder, store segmentation results as .jpg files  
+and output the single cell quantitative intensity data.
+
+```{r }
+source("AnalyzeAll.R")
+# set the function arguments according to your own parameter optimizations and then run the function for each image set:
+
+
+adapt.width = 10
+adapt.height = 10
+nuc.offset = 0.003
+cyto.offset = 0.004
+
+  # please make sure the order of the image.paths is CDKN1A, HSPA5 and then SRXN1
+  # if not change the order of `is.cytosol`
+  image.paths
+
+all.mean.int.data= list()
+for( i in seq_along(image.paths)){
+
+all.mean.int.data[[i]]<- AnalyzeAll(
+  adapt.width=adapt.width,
+                 adapt.height=adapt.height,
+                 nuc.offset=nuc.offset, 
+                 cyto.offset=cyto.offset,
+                 imagePath = image.paths[i],
+                 is.cytosol = c(FALSE, TRUE, TRUE )[i]
+                 )
+}
+
+myData <- do.call('rbind', all.mean.int.data)
+
+```
+
+
+###Q9) Have a look at the segmentations, are you happy with all the cytosol segmentations? Would you like to change the cyto.offset value? Why?
+
+## Summarize and visualize data
+```{r}
+head(myData) # display first 7 rows of function output
+#aggregate will calculate the population mean per image.name:
+summarized.data1 <- aggregate( b.mean  ~ image.name+cell  , data = myData, FUN = mean)
+summarized.data2<- aggregate( cellN  ~ image.name+cell  , data = myData, FUN = mean)
+summarized.data <- merge(summarized.data1, summarized.data2, by = c("image.name", "cell"))
+
+
+head(summarized.data)
+# much less data, dim() is short for dimension: calculates the dimension of the table
+dim(myData) # single  cell data
+dim(summarized.data) # mean per image
+head(summarized.data) # have a look at the result of aggregate
+```
+
+
+
+## Load the metadata and merge to your data
+** make sure you put the _layout.txt_  file in your working directory**
+
+We only know our intensity values for each image. It is handy to attach the treatment -  
+in this case the RNAi knock down genes
+```{r }
+
+metadata<- read.table(file = "layout.txt", header = TRUE, sep ="\t")
+head(metadata)
+head(summarized.data)
+
+# the merge function merges the two tables by matching the image identifiers "image.name" and "well"
+annotated.data <- merge(summarized.data, metadata, by.x = "image.name", by.y= "locationID" )
+head(annotated.data) # annotated.data contains both tables merged together
+```
+
+
+## Plotting
+Copy and paste all these lines in your terminal, and check out the resulting pdf and text file in your output folder
+```{r }
+# change the data format to `wide`
+head(annotated.data)
+annotated.data$treat.dose <- paste(annotated.data$treatment, annotated.data$concentration)
+annotated.data$treatment<-NULL
+annotated.data$image.name<-NULL
+annotated.data$concentration<-NULL
+annotated.data.m <- melt(annotated.data, id.vars = c("cell","treat.dose" ))
+head(annotated.data.m)
+
+annotated.data.wide <- dcast(annotated.data.m, treat.dose~cell+variable, mean  )
+rownames(annotated.data.wide) <- annotated.data.wide$treat.dose
+annotated.data.wide$treat.dose <- NULL
+head(annotated.data.wide)
+
+pdf( file = "output/results.pdf", height = 20, width =12)
+pheatmap(scale(annotated.data.wide))
+dev.off()
+
+write.table(annotated.data, file = "output/annotated_data.txt", sep = "\t", row.names=FALSE)
+
+
+```
+
+###Q10: Are there any apparent toxic compounds (cell death)?
+###Q11: Are there compound that activate (multiple) stress pathways?
