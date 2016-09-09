@@ -1,91 +1,81 @@
-AnalyzeAll <- function(adapt.width,
-                             adapt.height,
-                             nuc.offset, 
-                             cyto.offset,
-                             imagePath,
-                             is.cytosol)
+AnalyzeAll <- function(imagePath = image_paths_dna,
+                       adapt.width,
+                       adapt.height,
+                       nuc.offset, 
+                       cyto.offset
+                             )
 {
   
-  if( !is.numeric(c
-                  (adapt.width,
-                   adapt.height,
-                   nuc.offset, 
-                   cyto.offset
-                  )
-  )
-  )
   
-  
+  if( any(
+    !is.numeric(
+      c(adapt.width,
+        adapt.height,
+        nuc.offset,
+        cyto.offset
+         )
+      )
+    )
+  )
+
+
   {
     stop("please define numeric arguments")
   }
+
   
-  
-  imageSet <-dir(imagePath) 
   
   if(any(!grepl(
-    ".tif$", imageSet
+    ".tif$", imagePath
   )
   )
   )
   {
     stop("imageSet does not contain tif images")
   }
-  
- image.list.nuclei <- imageSet[grep("c1.tif", imageSet)] 
- image.list.GFP <- imageSet[grep("c2.tif", imageSet)] 
-  
-  
-  mean.int.data = list()
-  if(!file.exists("output")){
-    dir.create("output")
+ 
+ image_nuclei_path <- imagePath
+ image_GFP_path <- gsub("Channel2", "Channel1", imagePath)
+ 
+
+    if(!file.exists("results")){
+    dir.create("results")
   }
-  nmpje <- gsub("_","" ,str_match( imageSet[1], '[A-Z 1-9]{4,10}_'))
-  dir.create(
-    paste("output",
-    nmpje
-  , sep ="/")
-  )
+  nmpje <- gsub("_","" ,str_match( image_nuclei_path, '[A-H]{1}-[0-9]{2}.tif$'))
   
-  for( i in seq_along(image.list.nuclei))
-  {
-  
-    nuclei.image <- suppressWarnings(readImage(paste(imagePath, '/', image.list.nuclei[i], sep ="")))
-    cytosol.image <- suppressWarnings(readImage(paste(imagePath,'/', image.list.GFP[i], sep ="")))
-    
+
+    nuclei.image <- readImage(image_nuclei_path)
+    cytosol.image <- readImage(image_GFP_path)
+
     nuclei.image.f <- medianFilter(nuclei.image, size = 2)
-    nmask = thresh(nuclei.image.f, w=adapt.width, h=adapt.height, offset=nuc.offset)
-    nmask = opening(nmask, makeBrush(7, shape="disc"))
+    nmask <- thresh(nuclei.image.f, w=adapt.width, h=adapt.height, offset=nuc.offset)
+    nmask <- opening(nmask, makeBrush(7, shape="disc"))
     img <- rgbImage(green= cytosol.image, blue=nuclei.image)
-    nmask = bwlabel(nmask) # label nuclei
-    
+    nmask <- bwlabel(nmask) # label nuclei
+
     #Cytosol propagation:
-    if(is.cytosol){
+    
     cytosolmask = opening(cytosol.image > cyto.offset, makeBrush(5, shape="disc")) # erode + dilate
-    celmask = propagate(cytosol.image, seeds=nmask, mask=cytosolmask)
+    celmask <- propagate(cytosol.image, seeds=nmask, mask=cytosolmask)
+    colorMode(celmask) <- 0
+    colorMode(nmask) <- 0
+    res <- paintObjects(celmask, img, col="#ff00ff")  
+    res <- paintObjects(nmask, res, col= "#ffff00") 
+
+    nuclei_intensity <- computeFeatures.basic(x = nmask[ , , 1], cytosol.image[ , ,1])[ , 1] # calculate nuclei intensities of channel 1
+    cytosol_intensity <- computeFeatures.basic(x = celmask[ , , 1], cytosol.image[ , ,1])[ , 1 ] # calculate cell intensities of channel 1
     
-    res <- paintObjects(celmask, 16*img, col="#ff00ff")  # increase intensity of original image to see better (10X in this case). Add cell mask outline.
-    res <- paintObjects(nmask, res, col= "#ffff00") # add nuclei mask outline
+    cytosol_intensity <- cytosol_intensity - nuclei_intensity # subtract nuclei intensity
     
-    mean.int.data[[i]] <- as.data.frame(computeFeatures.basic(x = celmask, cytosol.image))
-    image.name <- gsub("c1.tif", "", str_match( image.list.nuclei[i], "xy[0-9]{2}c1.tif$"))
-    mean.int.data[[i]]$cellN <- max(nmask)
-    mean.int.data[[i]]$image.name <- as.character(image.name)
-    mean.int.data[[i]]$cell <- gsub("images/", "", imagePath)
-    writeImage(res, paste("output/", nmpje, "/", image.name, ".jpg", sep =""), quality = 85)
-    } else { # measure gfp in nuclei
-        res <- paintObjects(nmask, 16*img, col= "#ffff00") # add nuclei mask outline
-        mean.int.data[[i]] <- as.data.frame(computeFeatures.basic(x = nmask, cytosol.image))
-        image.name <- gsub("c1.tif", "", str_match( image.list.nuclei[i], "xy[0-9]{2}c1.tif$"))
-        mean.int.data[[i]]$cellN <- max(nmask)
-        mean.int.data[[i]]$image.name <- as.character(image.name)
-        mean.int.data[[i]]$cell <- gsub("images/", "", imagePath)
-        writeImage(res, paste("output/", nmpje, "/", image.name, ".jpg", sep =""), quality = 85)
-      
-      }
-    }
+    data_out <- list(nuclei_intensity = nuclei_intensity, cytosol_intensity = cytosol_intensity,
+              ratio_cyto_nucl = cytosol_intensity / nuclei_intensity)
+    
+    
+    data_out$cellN <- max(nmask)
+    data_out$image.name <- as.character(nmpje)
+    
+    writeImage(res, paste("results/", nmpje, ".jpg", sep =""), quality = 85)
   
-  all.mean.int.data <- do.call("rbind", mean.int.data)
-  
-  return(all.mean.int.data)
+  print(paste( nmpje, " processed"))
+  return(data_out)
 } # end AnalyzeAllImages function

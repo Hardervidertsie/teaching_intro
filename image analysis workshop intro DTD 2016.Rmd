@@ -13,6 +13,10 @@ This 96-well plate has images of cytoplasm to nucleus translocation of the Forkh
 
 source: https://data.broadinstitute.org/bbbc/BBBC013/
 
+### In this systems microscopy workshop:
+We will learn some basic methods of analyzing imaging data obtained from a high content imager.  
+First we determine the image analysis parameters, then we will run a pre-made script to analyze all the images.  
+
 
 ## complete the analysis by following the steps bellow. Then answer the questions.
 
@@ -125,9 +129,8 @@ image_fkhr <- readImage( image_paths_fkhr[13] )
 
 display(image_dna) 
 display(image_fkhr)
-display(
-  rgbImage(green = image_fkhr, blue = image_dna)
-)
+rgb_img <- rgbImage(green = image_fkhr, blue = image_dna)
+display(rgb_img)
 
 ```
 
@@ -153,7 +156,7 @@ tip: what is the mean intensity value? `mean(nuclei.image)`
 *Q3) Why would the mean intensity value of the stained nuclei be usefull? (Think of pixel intensity values)*  
 *Q4) What would you consider to be the maximum values of the adaptive width and height parameters?*  
 
-*9) Set the parameters and test on the selected nuclei image. Make sure the segmentation is satisfactory*
+*9) Set the parameters and test on the selected nuclei image. Make sure the segmentation is satisfactory by playing with the paramter values*
 
 ```{r }
 
@@ -161,7 +164,7 @@ mean(image_dna)
 
 adaptive.width <- 10 # set parameter (the size in pixels of the windows in which the optimized threshold values will be constant )
 adaptive.height <- 10  # set parameter
-nuclei.offset <-  0.03 # set parameter
+nuclei.offset <-  0.02 # set parameter
 
 # remember to keep looking at the original image to compare:
 display(image_dna)
@@ -186,7 +189,7 @@ Noisy (outlier) pixel intensities are averaged out, making it easier for the alg
 
 image_dna_f <- medianFilter(image_dna, size = 2) 
 display(image_dna_f)
-nmask = thresh(nuclei.image.f, w=adaptive.width, h=adaptive.height, offset=nuclei.offset) 
+nmask = thresh(image_dna_f, w=adaptive.width, h=adaptive.height, offset=nuclei.offset) 
 display(nmask) 
 ```
 
@@ -207,7 +210,7 @@ Eroding is removing 'outer' pixels from our mask (segmented image), dilating is 
 *Q9) Explain why this would work*  
 
 
-*12) label and count the identified foreground objects from the mask image.*  
+*12) label and count the identified foreground objects from the mask-image.*  
 
 ```{r }
 
@@ -216,86 +219,103 @@ max(nmask) # number of nuclei
 
 ``` 
 
-download.file( url = "https://raw.github.com/Hardervidertsie/teaching_intro/master/AnalyzeAll.R",
-destfile = "scripts/AnalyzeAll.R" )
-
 
 ## Cytosol propagation  
 
-Here the nuclei objects are used as starting points (seeds) to find the corresponding cytosol from the GFP stained images.
-Set the `cytosol.offset` for a good segmentation
-Use the same trick for a good starting point
+Here the nuclei objects are used as starting points (seeds) to find the corresponding GFP signal from the FKHR-GFP.  
+
+*13) Set the `cytosol.offset` for a good segmentation*
+
 ```{r }
-mean(cytosol.image)
-cytosol.offset <- 0.004  # set parameter 
-cytosolmask = opening(cytosol.image > cytosol.offset, makeBrush(5, shape="disc")) # erode + dilate, threshhold and smooth
-display(cytosolmask) # happy?
-celmask = propagate(cytosol.image, seeds=nmask, mask=cytosolmask) # use cytosol mask to assign a cytosol to each nuclei
+
+mean(image_fkhr)
+cytosol.offset <- 0.08  # set parameter, play with this parameter for optimal result 
+
+colorMode(image_fkhr) <- 0 # set to required greyscale colormode
+cytosolmask = opening(image_fkhr > cytosol.offset, makeBrush(5, shape="disc")) # erode + dilate, threshhold and smooth
+display(cytosolmask) 
+celmask = propagate(image_fkhr, seeds=nmask, mask=cytosolmask) # use cytosol mask to assign a cytosol to each nuclei
 display(celmask)
-2
-res <- paintObjects(celmask, 16*img, col="#ff00ff")  # paintObjects makes nice outlines of segmentation results
-res = paintObjects(nmask, res, col= "#ffff00") # add nuclei mask outline
+
+res <- paintObjects(celmask, rgb_img, col="#ff00ff")  # paintObjects makes nice outlines of segmentation results
+colorMode(nmask) <- 0
+res <- paintObjects(nmask, res, col= "#ffff00") # add nuclei mask outline
 display(res) # display final results
+
+
 ```
 
-Q6) Describe the yellow and purple lines. What do they represent?
 
-## computeFeatures
-Use the computeFeatures function to calculate the intensity data for each cell.
+*Q10) Describe the yellow and purple lines. What do they represent?*
+*Q11) Describe the algorithms used to obtain this result in your own words*
+
+## compute Features  
+
+*14) Use the computeFeatures function to calculate the intensity data for each cell.*
+*15) Visualize the distribution of the intensity values.*
+
 ```{r }
-mean.int.data <- computeFeatures.basic(x = nmask, cytosol.image)
-head(mean.int.data) # have a look at the data, more intensity measures are calculated
-# should we consider the single cell data in the analysis or can we take the mean value?
-plot(density(mean.int.data[, 'b.mean']))
+nuclei_intensity <- computeFeatures.basic(x = nmask[ , , 1], image_fkhr[ , ,1])[ , 1] # calculate nuclei intensities of channel 1
+cytosol_intensity <- computeFeatures.basic(x = celmask[ , , 1], image_fkhr[ , ,1])[ , 1 ] # calculate cell intensities of channel 1
+
+cytosol_intensity <- cytosol_intensity - nuclei_intensity # subtract nuclei intensity
+
+plot(density(cytosol_intensity))
+plot(density(nuclei_intensity))
+plot(density(cytosol_intensity / nuclei_intensity))
+
 ```
 
-###Q7) What do the first and second peaks represent?
-###Q8) Where would you place the offset value? Would this be a horizontal or vertical line in the density plot?
+*Q12) Why was the nuclei intensity subtracted from the cell intensity values?*  
+*Q13) Explain what the division ```cytosol_intensity / nuclei_intensity``` means*
+*Q14) Why is there a small peak at 0 for the density figure of cytosol_intensity?*
 
+## Analyse the full image set
 
-## Run analysis with obtained parameters
 Now you know what is going on, we will run a function which basically does the same we did before - but for all images.  
 The function will require your image-analysis parameters as arguments
-With `source(function name)' we will load this function in R memory
-**Make sure you first download the R script file *AnalyzeAll.R* and place it in your working directory**
+With `source(function name)' we will load this function in R memory so that it can be called.
+
 The `AnalyzeAll.R()' function will load the images from your image folder, store segmentation results as .jpg files  
 and output the single cell quantitative intensity data.
 
+*15) Download the AnalyzeAll.R function from git, and source the function*
 ```{r }
-source("AnalyzeAll.R")
-# set the function arguments according to your own parameter optimizations and then run the function for each image set:
+
+download.file( url = "https://raw.github.com/Hardervidertsie/teaching_intro/master/AnalyzeAll.R",
+destfile = "scripts/AnalyzeAll.R" )
+
+source("D:/teaching/lectures/2016 -2017/intro course DTD/EBI_analysis/AnalyzeAll.R") # load the function so you can use it. 
+source("scripts/AnalyzeAll.R")
+```
+
+*16) set the function arguments according to your own parameter optimizations (or use the provided defaults) and then run the function.*
+```{r }
 
 
-adapt.width = 10
-adapt.height = 10
-nuc.offset = 0.003
-cyto.offset = 0.004
 
-  # please make sure the order of the image.paths is CDKN1A, HSPA5 and then SRXN1
-  # if not change the order of `is.cytosol`
-  image.paths
+data_out <- lapply( image_paths_dna, AnalyzeAll,
+                      adapt.width  = 10,
+                      adapt.height = 10,
+                      nuc.offset   = 0.02, 
+                      cyto.offset  = 0.08 
+                    )
 
-all.mean.int.data= list()
-for( i in seq_along(image.paths)){
 
-all.mean.int.data[[i]]<- AnalyzeAll(
-  adapt.width=adapt.width,
-                 adapt.height=adapt.height,
-                 nuc.offset=nuc.offset, 
-                 cyto.offset=cyto.offset,
-                 imagePath = image.paths[i],
-                 is.cytosol = c(FALSE, TRUE, TRUE )[i]
-                 )
-}
-
-myData <- do.call('rbind', all.mean.int.data)
+data_out <- do.call('rbind', data_out)
 
 ```
 
 
-###Q9) Have a look at the segmentations, are you happy with all the cytosol segmentations? Would you like to change the cyto.offset value? Why?
+*17) Have a look at the segmentations, decide if the parameters are satisfactory. If not - re do the analysis.*
 
-## Summarize and visualize data
+## From image analysis tot data analysis
+The images have been analysed, our result consists of quantitative data, representing features we are interested in (the GFP levels in the nucleus and cytosol)  
+First we have to organize the data in a for us meaningfull way.  
+
+
+*18) Look at the single cell intensity distributions. 
+
 ```{r}
 head(myData) # display first 7 rows of function output
 #aggregate will calculate the population mean per image.name:
@@ -311,6 +331,7 @@ dim(summarized.data) # mean per image
 head(summarized.data) # have a look at the result of aggregate
 ```
 
+* 
 
 
 ## Load the metadata and merge to your data
