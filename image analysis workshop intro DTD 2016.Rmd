@@ -285,7 +285,6 @@ and output the single cell quantitative intensity data.
 download.file( url = "https://raw.github.com/Hardervidertsie/teaching_intro/master/AnalyzeAll.R",
 destfile = "scripts/AnalyzeAll.R" )
 
-source("D:/teaching/lectures/2016 -2017/intro course DTD/EBI_analysis/AnalyzeAll.R") # load the function so you can use it. 
 source("scripts/AnalyzeAll.R")
 ```
 
@@ -301,8 +300,8 @@ data_out <- lapply( image_paths_dna, AnalyzeAll,
                       cyto.offset  = 0.08 
                     )
 
-
 data_out <- do.call('rbind', data_out)
+head(data_out) # preview the data)
 
 ```
 
@@ -314,7 +313,36 @@ The images have been analysed, our result consists of quantitative data, represe
 First we have to organize the data in a for us meaningfull way.  
 
 
-*18) Look at the single cell intensity distributions. 
+*19) Add human readable metadata by downloading the plate layout file and merging to our data.  
+
+```{r }
+ 
+download.file( url = "https://raw.github.com/Hardervidertsie/teaching_intro/master/layout-BBBC013.txt",
+destfile = "layout/layout-BBBC013.txt" )
+
+layout <- read.delim( file = "layout/layout-BBBC013.txt", sep ="\t")
+head(layout)
+
+data_out$image.name <- gsub(".tif", "", data_out$image.name)
+
+data_single_cells <- merge(data_out, layout, by.x = "image.name", by.y = "locationID")
+head(data_single_cells)
+
+```
+
+*20) Look at the single cell intensity distributions.* 
+
+```{r }
+
+plot(density(data_single_cells$cytosol_intensity))
+plot(density(data_single_cells$nuclei_intensity))
+
+```
+
+*Q15) Explain for the cytosol intensity the negative values. What does this mean biologically?*
+*Q16) Explain for the nuclei intensity the right tail shape. What does this mean biologically?*
+
+
 
 ```{r}
 head(myData) # display first 7 rows of function output

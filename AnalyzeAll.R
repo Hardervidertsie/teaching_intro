@@ -67,7 +67,7 @@ AnalyzeAll <- function(imagePath = image_paths_dna,
     
     cytosol_intensity <- cytosol_intensity - nuclei_intensity # subtract nuclei intensity
     
-    data_out <- list(nuclei_intensity = nuclei_intensity, cytosol_intensity = cytosol_intensity,
+    data_out <- data.frame(nuclei_intensity = nuclei_intensity, cytosol_intensity = cytosol_intensity,
               ratio_cyto_nucl = cytosol_intensity / nuclei_intensity)
     
     
