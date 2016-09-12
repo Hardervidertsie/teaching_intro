@@ -74,7 +74,6 @@ biocLite("EBImage")
 
 
 
-
 ```
 
 
@@ -99,9 +98,9 @@ https://bioconductor.org/packages/release/bioc/vignettes/EBImage/inst/doc/EBImag
 *4) Execute the following 5 commands, then have a look at the created folder structure.*  
 
 ```{r, eval=FALSE }
-dir.create("~/imageanalysis")
+dir.create("imageanalysis")
 
-setwd("~/imageanalysis")
+setwd("imageanalysis")
 
 dir.create("results")
 
