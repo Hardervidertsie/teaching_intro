@@ -43,7 +43,6 @@ AnalyzeAll <- function(imagePath = image_paths_dna,
   }
   nmpje <- gsub("_","" ,str_match( image_nuclei_path, '[A-H]{1}-[0-9]{2}.tif$'))
   
-
     nuclei.image <- readImage(image_nuclei_path)
     cytosol.image <- readImage(image_GFP_path)
 
@@ -74,7 +73,7 @@ AnalyzeAll <- function(imagePath = image_paths_dna,
     data_out$cellN <- max(nmask)
     data_out$image.name <- as.character(nmpje)
     
-    writeImage(res, paste("results/", nmpje, ".jpg", sep =""), quality = 85)
+    writeImage(res[, , ,1], paste("results/", nmpje, ".jpg", sep =""), quality = 85)
   
   print(paste( nmpje, " processed"))
   return(data_out)

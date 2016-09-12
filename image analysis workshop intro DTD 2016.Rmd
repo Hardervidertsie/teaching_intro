@@ -5,11 +5,13 @@ date: "Tue 13 Sept 15.30 - 17.30:  	LCP 06"
 output: html_document
 ---
 
+*Note to students: during the exam no knowlegde of R will be required. R is merely used as a tool. However a subset of questions of this practical, or questions closely related to, can be asked during the exam. Make sure you try to understand all these questions, and ask the examinators for help during the practical or during exam-preparation as some of them can be difficult.*  
+
+
 ![](Capture.PNG  )
 
 ## Biological application
 This 96-well plate has images of cytoplasm to nucleus translocation of the Forkhead (FKHR-EGFP) fusion protein in stably transfected human osteosarcoma cells, U2OS. In proliferating cells, FKHR is localized in the cytoplasm. Even without stimulation, Forkhead is constantly moving into the nucleus, but is transported out again by export proteins. Upon inhibition of nuclear export, FKHR accumulates in the nucleus. In this assay, export is inhibited by blocking PI3 kinase / PKB signaling by incubating cells for 1 h with Wortmannin or with the compound LY294002. Both drugs are considered positive controls in the assay. Nuclei are stained with DRAQ, a DNA stain.
-
 
 source: https://data.broadinstitute.org/bbbc/BBBC013/
 
@@ -17,25 +19,61 @@ source: https://data.broadinstitute.org/bbbc/BBBC013/
 We will learn some basic methods of analyzing imaging data obtained from a high content imager.  
 First we determine the image analysis parameters, then we will run a pre-made script to analyze all the images.  
 
-
-## complete the analysis by following the steps bellow. Then answer the questions.
-
+## complete the analysis by following the steps below. There are do's (numbered) and questions (Q#)
 
 *1) In RStudio, go to *File -> New File -> R Script*
 
 The new R script is displayed in the text editor pane. This is where you type the commands/ code.
 Execute a line of your code by pressing _CTRL ENTER_. The line where your cursor is active is executed. You can also select multiple lines or a small part of code to execute in the same manner.  
 
-
-*2) Install the following external packages, which contain the needed functionality for image analysis and graphics.*
+*2) Install the following external packages, which contain the needed functionality for image analysis and graphics. If the installation fails, skip and follow the next block.*
 
 ```{r, eval=FALSE }
+# 
+#  install.packages(c("tiff", "jpeg", "png", "locfit" , "fftwtools"))
+# 
+# 
+#  source("http://bioconductor.org/biocLite.R") # bioconductor installation scripts
+# 
+#  biocLite("EBImage")
+# 
+#  install.packages(c("ggplot2","stringr"))
+
+```
+
+if installation is not successful (there seems to be a problem with win binaries at the moment), install the packages in this manner:
+
+```{r, eval = FALSE }
+
+
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/stringi_1.1.1.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/stringr_1.1.0.zip", repos =NULL)
+
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/scales_0.4.0.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/Rcpp_0.12.7.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/munsell_0.4.3.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/colorspace_1.2-6.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/plyr_1.8.4.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/ggplot2_2.1.0.zip", repos =NULL)
+
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/locfit_1.5-9.1.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/tiff_0.1-5.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/jpeg_0.1-8.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/png_0.1-7.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/fftwtools_0.9-7.zip", repos =NULL)
+
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/gtable_0.2.0.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/magrittr_1.5.zip", repos =NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/labeling_0.3.zip", repos = NULL)
+install.packages("https://cran.r-project.org/bin/windows/contrib/3.3/digest_0.6.10.zip", repos = NULL)
+
 
 source("http://bioconductor.org/biocLite.R") # bioconductor installation scripts
+ 
+biocLite("EBImage")
 
-biocLite("EBImage") # run installation script for "EBImage" - the image analysis package
 
-install.packages(c("ggplot2" ,"stringr"), repos="http://cran.rstudio.com/")
+
 
 ```
 
@@ -43,21 +81,24 @@ install.packages(c("ggplot2" ,"stringr"), repos="http://cran.rstudio.com/")
 *3) Load the installed packages (this has to be done for every R-session)*
 
 ```{r }
-require(ggplot2)
-require(EBImage)
-require(stringr)
+
+library(ggplot2)
+library(EBImage)
+library(stringr)
+options(EBImage.display = "raster") # set display options
+
 ```
 
 *EBImage: This package contains our image analysis functions.  
 for more information on this package you can visit:  
 https://bioconductor.org/packages/release/bioc/vignettes/EBImage/inst/doc/EBImage-introduction.html  
-*ggplot2: A graphics package 
+*ggplot2: A graphics package  
 *stringr: A regular expression package for working with strings 
 
 
 *4) Execute the following 5 commands, then have a look at the created folder structure.*  
 
-```{r }
+```{r, eval=FALSE }
 dir.create("~/imageanalysis")
 
 setwd("~/imageanalysis")
@@ -72,7 +113,7 @@ dir.create("scripts")
 
 *5) Download and unzip the BBBC013 image set:*
 
-```{r }
+```{r, eval=FALSE }
 
 download.file(url = "http://d1zymp9ayga15t.cloudfront.net/content/Examplezips/ExampleSBSImages.zip",
                destfile = "images.zip")
@@ -86,7 +127,7 @@ unzip(zipfile = "images.zip",  files = unzipfiles)
 
 *6) Unpack and load the file containing the metadata information.*  
 
-```{r }
+```{r, eval=FALSE }
 unzipmetadata <- unziplist$Name[ grepl(".csv", unziplist$Name)] # pull out all files containing ".tif"
 unzip(zipfile = "images.zip", exdir = "layout",  files = unzipmetadata )
 
@@ -103,7 +144,7 @@ with headers containing information needed for image display:
 
 *7) Look at one of the images from our image set*  
 
-```{r}
+```{r, eval=FALSE}
 path_to_image <- "ExampleSBSImages/Channel1-23-B-11.tif"
 
 readImage(path_to_image)
@@ -112,11 +153,11 @@ display(readImage(path_to_image))
 ```
 
 
-Different dyes can be used to observe distinct features, including structures, proteins, and different organelles within cells. This image set contains two channels of which one constitutes the nucleus (Channel2), and the the second channel is FKHR-GFP which can be located in the nucleus and the cytosol.
+Different dyes can be used to observe distinct features, including structures, proteins, and different organelles within cells. This image set contains two channels of which one constitutes the nucleus (Channel2), and the the other channel is FKHR-GFP (Channel1) which can be located in the nucleus and the cytosol.
 
 *8) Look at both channels superimposed on one another.*
 
-```{r }
+```{r, eval=FALSE }
 
 image_paths <- paste0("ExampleSBSImages/", dir("ExampleSBSImages")) # define paths to images
 image_paths <- image_paths[grepl(".tif$", image_paths)] # keep only paths to tif images
@@ -140,15 +181,15 @@ display(rgb_img)
 
 ## Nuclei segmentation and object identification  
 
-Segmentation is the recognition of objects in images by a computer, using for example the pixel intensity values.
+In the context of image analysis, segmentation is the recognition of objects of interest in images by a computer, using for example the pixel intensity values.
 Consider an image to be a collection of pixels in the 2D grid/matrix. The stained DNA/ nuclei thus each form a
 collection/cluster of higher valued pixels than the surrounding background. Setting a threshold/ offset to determine
 "foreground" objects (the nuclei) vs the lower intensity value pixels of the background is a usefull method to determine
 which pixels belong to nuclei objects.
 
 There are 3 parameters needed for a correct segmentation.  
-We will use an adaptive threshholding algorithm, so the threshhold value can change in windows of width X height. The starting value for the thresholding optimization is the nuclei.offset
-Make sure you are happy with your chosen `adaptive.width`, `adaptive.height` and `nuclei.offset` settings because these will be  
+We will use an adaptive threshholding algorithm, so the threshhold value can change in windows of width X height (in units of pixels). The starting value for the thresholding optimization is the ```nuclei.offset```.   
+Make sure you are happy with your chosen `adaptive.width`, `adaptive.height` and `nuclei.offset` settings because these will be
 used for the full analysis of all images later on. The adaptive width and height are measured in pixels.
 
 tip: what is the mean intensity value? `mean(nuclei.image)`
@@ -156,9 +197,9 @@ tip: what is the mean intensity value? `mean(nuclei.image)`
 *Q3) Why would the mean intensity value of the stained nuclei be usefull? (Think of pixel intensity values)*  
 *Q4) What would you consider to be the maximum values of the adaptive width and height parameters?*  
 
-*9) Set the parameters and test on the selected nuclei image. Make sure the segmentation is satisfactory by playing with the paramter values*
+*9) Set the parameters and test on the selected nuclei image. Make sure the segmentation is satisfactory by playing with the parameter values*
 
-```{r }
+```{r, eval=FALSE }
 
 mean(image_dna)
 
@@ -185,7 +226,7 @@ Noisy (outlier) pixel intensities are averaged out, making it easier for the alg
 
 *10) filter the raw images before segmenting*  
 
-```{r }
+```{r, eval=FALSE }
 
 image_dna_f <- medianFilter(image_dna, size = 2) 
 display(image_dna_f)
@@ -197,14 +238,14 @@ display(nmask)
 
 *11) erode & dilate the masked image*
 
-```{r }
+```{r, eval=FALSE }
 
 nmask = opening(nmask, makeBrush(7, shape="disc")) # erosion + dilation
 display(nmask)
 
 ```
 
-Eroding is removing 'outer' pixels from our mask (segmented image), dilating is adding 'outer' pixels
+Eroding is removing 'outer' pixels from our masked objects in the segmented image, dilating is adding 'outer' pixels. Think of two slightly overlapping cells that are mistakingly segmented as 1 object, and how this algorithm will affect this segmented object.
 
 *Q8) Did the segmentation improve using erosion/dilation algorithm?*
 *Q9) Explain why this would work*  
@@ -212,7 +253,7 @@ Eroding is removing 'outer' pixels from our mask (segmented image), dilating is 
 
 *12) label and count the identified foreground objects from the mask-image.*  
 
-```{r }
+```{r, eval=FALSE }
 
 nmask = bwlabel(nmask) # label nuclei: defining objects (each distincly segmented nuclei gets a number)
 max(nmask) # number of nuclei
@@ -226,7 +267,7 @@ Here the nuclei objects are used as starting points (seeds) to find the correspo
 
 *13) Set the `cytosol.offset` for a good segmentation*
 
-```{r }
+```{r, eval=FALSE }
 
 mean(image_fkhr)
 cytosol.offset <- 0.08  # set parameter, play with this parameter for optimal result 
@@ -246,15 +287,15 @@ display(res) # display final results
 ```
 
 
-*Q10) Describe the yellow and purple lines. What do they represent?*
+*Q10) Describe the yellow and purple lines. What do they represent?*  
 *Q11) Describe the algorithms used to obtain this result in your own words*
 
-## compute Features  
+## Compute features  
 
-*14) Use the computeFeatures function to calculate the intensity data for each cell.*
-*15) Visualize the distribution of the intensity values.*
+*14) Use the computeFeatures function to calculate the intensity data for each cell.*  
+*15) Visualize the distribution of the intensity values.*  
 
-```{r }
+```{r, eval=FALSE }
 nuclei_intensity <- computeFeatures.basic(x = nmask[ , , 1], image_fkhr[ , ,1])[ , 1] # calculate nuclei intensities of channel 1
 cytosol_intensity <- computeFeatures.basic(x = celmask[ , , 1], image_fkhr[ , ,1])[ , 1 ] # calculate cell intensities of channel 1
 
@@ -267,29 +308,34 @@ plot(density(cytosol_intensity / nuclei_intensity))
 ```
 
 *Q12) Why was the nuclei intensity subtracted from the cell intensity values?*  
-*Q13) Explain what the division ```cytosol_intensity / nuclei_intensity``` means*
-*Q14) Why is there a small peak at 0 for the density figure of cytosol_intensity?*
+*Q13) Explain what the division ```cytosol_intensity / nuclei_intensity``` means regarding FKHR levels*  
+*Q14) Why is there a small peak at 0 for the density figure of cytosol_intensity?*  
 
 ## Analyse the full image set
 
 Now you know what is going on, we will run a function which basically does the same we did before - but for all images.  
 The function will require your image-analysis parameters as arguments
-With `source(function name)' we will load this function in R memory so that it can be called.
+With ```source(function name)``` we will load this function in R memory so that it can be called.
 
-The `AnalyzeAll.R()' function will load the images from your image folder, store segmentation results as .jpg files  
-and output the single cell quantitative intensity data.
+The `AnalyzeAll.R' script contains the ```AnalyzeAll()``` function, this function will load the images from your image folder, store segmentation results as .jpg files  
+and output the single cell quantitative intensity data.  
 
 *15) Download the AnalyzeAll.R function from git, and source the function*
-```{r }
+
+```{r, eval=FALSE }
 
 download.file( url = "https://raw.github.com/Hardervidertsie/teaching_intro/master/AnalyzeAll.R",
 destfile = "scripts/AnalyzeAll.R" )
+
+
+
 
 source("scripts/AnalyzeAll.R")
 ```
 
 *16) set the function arguments according to your own parameter optimizations (or use the provided defaults) and then run the function.*
-```{r }
+
+```{r, eval=FALSE }
 
 
 
@@ -308,14 +354,14 @@ head(data_out) # preview the data
 
 *17) Have a look at the segmentations, decide if the parameters are satisfactory. If not - re do the analysis.*
 
-## From image analysis tot data analysis
-The images have been analysed, our result consists of quantitative data, representing features we are interested in (the GFP levels in the nucleus and cytosol)  
+## From image analysis to data analysis
+The images have been analysed, our result consists of quantitative data, representing features we are interested in (the GFP levels in the nucleus and cytosol and the cell count).  
 First we have to organize the data in a for us meaningfull way.  
 
 
-*19) Add human readable metadata by downloading the plate layout file and merging to our data.  
+*18) Add human readable metadata by downloading the plate layout file and merging this to our data.*  
 
-```{r }
+```{r, eval=FALSE }
  
 download.file( url = "https://raw.github.com/Hardervidertsie/teaching_intro/master/layout-BBBC013.txt",
 destfile = "layout/layout-BBBC013.txt" )
@@ -330,37 +376,40 @@ head(data_single_cells)
 
 ```
 
-*20) Look at the single cell intensity distributions.* 
+*19) Plot the single cell intensity distributions.* 
 
-```{r }
+```{r, eval=FALSE }
 
 plot(density(data_single_cells$cytosol_intensity))
 plot(density(data_single_cells$nuclei_intensity))
 
 ```
 
-*Q15) Explain for the cytosol intensity the negative values. What does this mean biologically?*
-*Q16) Explain for the nuclei intensity the right tail shape. What does this mean biologically?*
+*Q15) Explain for the cytosol intensity the negative values. What does this mean biologically?*  
+*Q16) Explain for the nuclei intensity the right tailed distribution. What does this mean biologically?*  
 
 
-*21) calculate the population mean of the intensity ratios per replicate and plot the dose response curves for each replicate*
+*20) calculate the population mean of the intensity ratios per replicate and plot the dose response curves for each replicate*
 
-```{r}
+```{r, eval=FALSE }
 
 summarized_data_intensity <- aggregate( ratio_cyto_nucl ~ treatment + dose + replID  , data = data_single_cells, FUN = mean)
 
-head(summarized.data)
+head(summarized_data_intensity)
 
 ggplot( data = summarized_data_intensity, aes( x = log(dose +1), y = ratio_cyto_nucl, color = replID )) +
   geom_point( aes( group = dose ) ) + facet_wrap( ~treatment, ncol = 1 , scales = "free_x" ) +
   geom_smooth( )
 
+
+
 ```
 
+*Q17) Are the drugs working? Please explain.*  
 
-*22) Visualize the correlation between the cell count and the intensity ratio*
+*21) Visualize the correlation between the cell count and the intensity ratio*
 
-```{r }
+```{r, eval=FALSE }
 
 summarized_data_cellcount <- aggregate( cellN ~ treatment + dose + replID  , data = data_single_cells, FUN = mean)
 
@@ -373,5 +422,5 @@ text(x= 0.1, y = 270, label = paste("pval slope:", round( RS$coefficients[ , "Pr
 
 ```
 
-*23) Based on the data explanation on the broad website, what would you expect regarding cell count and the cytosol/ nucleus intensity ratio?*
-*24) Explain if you see any evidence if this is the case*
+*Q18) Based on the data explanation on the broad website, what would you expect regarding cell count and the cytosol/ nucleus intensity ratio?*  
+*Q19) Explain if you see any evidence that this is the case*  
